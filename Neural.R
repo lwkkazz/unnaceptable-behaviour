@@ -8,7 +8,9 @@ normalize <- function(x) {
   return ((x - min(x)) / (max(x) - min(x)))
 }
 
-data <- fread("C:\\Users\\lucas\\Desktop\\Machine Learning\\Data\\Flying Etiquette\\flying-etiquette.csv", stringsAsFactors = T, na.strings="NA")
+cdd <- "C:\\Users\\lucas\\Desktop\\Machine Learning\\Data\\"
+
+data <- fread(paste0(cdd, "flying-etiquette.csv"), stringsAsFactors = T, na.strings="NA")
 data[data == ''] <- NA
 missmap(train)
 
