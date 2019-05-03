@@ -1,4 +1,7 @@
 rm(list=ls())
+
+library(randomForest)
+
 library (data.table)
 library (ROCR)
 library (bit64)
@@ -50,6 +53,5 @@ form <- as.formula(paste("Trancamento ~", paste(nam[!nam %in% "Trancamento"], co
 
 #######################
 
-model <- glm(form, data = data_train, family = 'binomial')
-
-
+randomF <- randomForest(form, type = "classification", ntree = 2000, data = data_train, importance = TRUE)
+randomF

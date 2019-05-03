@@ -1,4 +1,7 @@
 rm(list=ls())
+
+library(neuralnet)
+
 library (data.table)
 library (ROCR)
 library (bit64)
@@ -50,6 +53,38 @@ form <- as.formula(paste("Trancamento ~", paste(nam[!nam %in% "Trancamento"], co
 
 #######################
 
-model <- glm(form, data = data_train, family = 'binomial')
+nn <- neuralnet(form, data=data_train, hidden=c(2, 2), lifesign = "full")
 
 
+
+end_time <- Sys.time()
+
+time <- end_time - start_time
+
+temp_test <- test
+
+nn.results <- compute(nn, temp_test)
+results <- data.frame(actual = test$recline, prediction = nn.results$net.result)
+
+
+roundedresults<-sapply(results,round,digits=0)
+roundedresultsdf=data.frame(roundedresults)
+attach(roundedresultsdf)
+table(actual,prediction)
+
+
+pred <- predict(nn, test, type="response")
+ROCRpred <- prediction(pred, test$recline)
+ROCRperf <- performance(ROCRpred, 'tpr', 'fpr')
+plot(ROCRperf, colorize = TRUE, text.adj = c(-0.2, 1.2))
+
+test$predicted <- pred
+
+test$hitmiss <- ifelse(((test$recline == 1 & test$predicted >= 0.5) | (test$recline == 0 & test$predicted < 0.5)),1,0)
+mean(test$hitmiss)
+plot(nn)
+
+auc_ROCR <- performance(ROCRpred, measure = "auc")
+auc_ROCR <- auc_ROCR@y.values[[1]]
+
+message(paste0("Neural network train time: ", time))
