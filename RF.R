@@ -1,47 +1,58 @@
 rm(list=ls())
 
 library(randomForest)
-
 library (data.table)
 library (ROCR)
 library (bit64)
-library (Amelia)
 library (na.tools)
 
 normalize <- function(x) {
   return ((x - min(x)) / (max(x) - min(x)))
 }
 
-cdd <- "C:\\Users\\lucas\\Desktop\\Machine Learning\\ProjetoML\\data\\"
+# cdd <- "C:\\Users\\lucas\\Desktop\\Machine Learning\\ProjetoML\\data\\"
+cdd <- paste0(path.expand("~"), "/Documentos/proj/data/")
 
 data <- fread(paste0(cdd, "base_perfil.csv"), stringsAsFactors = T, dec = ",")
+
+origNames <- colnames(data)
 
 data[data == ''] <- NA
 data[data == 'NA'] <- NA
 data[data == 'N/A'] <- NA
-data$`Qual é a sua idade-` <- na.mean(data$`Qual é a sua idade-`, option = "mean")
-
-summary(data)
 
 data <- as.data.frame(lapply(data, unclass))
 
-data$Qual.é.o.nível.de.escolaridade.de.seu.pai. <- NULL
-data$Qual.é.o.nível.de.escolaridade.de.sua.mãe. <- NULL
-data$Qual.é.o.tipo.de.vínculo.da.sua.atividade.remunerada..não.acadêmica.. <- NULL
-data$Você.pretende.solicitar.transferência.para.outro.Bacharelado.Interdisciplinar.da.UFABC.no..próximo.ano.acadêmico.. <- NULL
-data$No.atual.quadrimestre.letivo..você.cursa.disciplinas.em.qual.is..campus.i... <- NULL
-data$No.atual.quadrimestre.letivo..em.qual.turno.você.frequenta.a.maioria.das.disciplinas.. <- NULL
-data$Você.já.efetuou.trancamento.total.de.matrícula. <- NULL
-data$Quantas.horas..em.média..você.permanece.na.UFABC.por.semana. <- NULL
-data$Você.possui.a.intenção.de.iniciar.um.curso.de.pós.graduação.stricto.sensu..mestrado.ou.doutorado..logo.após.a.sua.graduação. <- NULL
+names <- c()
+nas   <- c()
+for(i in 1:ncol(data)){
+  names[i] <- paste0("F", i)
+  nas[i]   <- sum(is.na(data[i]))
+}
+colnames(data) <- names
+# 
+# for(i in 1:ncol(data)){
+#   message(paste0(i, ": ", nas[i], " = ", origNames[i]))
+# }
 
-data[is.na(data$Você.já.foi.reprovado.em.alguma.disciplina..), ] <- 0
+data$F2   <- NULL
+data$F3   <- NULL
+data$F31  <- NULL
+data$F33  <- NULL
+data$F47  <- NULL
+data$F5  <- na.mean(data$F5, option = "mean")
+
+data[is.na(data$F28), ] <- 0
+data[is.na(data$F29), ] <- 0
+data[is.na(data$F32), ] <- 0
+data[is.na(data$F38), ] <- 0
+data[is.na(data$F39), ] <- 0
 
 # missmap(data)
 
 data <- as.data.frame(lapply(data, normalize))
 
-data$Trancamento <- as.factor(data$Trancamento)
+data$F34 <- as.factor(data$F34)
 
 data_train <- head(data, nrow(data)*0.7)
 data_test  <- tail(data, nrow(data)*0.3)
@@ -49,9 +60,26 @@ data_test  <- tail(data, nrow(data)*0.3)
 summary(data_train)
 
 nam <- names(data)
-form <- as.formula(paste("Trancamento ~", paste(nam[!nam %in% "Trancamento"], collapse = " + ")))
+form <- as.formula(paste("F34 ~", paste(nam[!nam %in% "F34"], collapse = " + ")))
 
 #######################
 
-randomF <- randomForest(form, type = "classification", ntree = 2000, data = data_train, importance = TRUE)
-randomF
+randomF <- randomForest(form, type = "classification", ntree = 3000, data = data_train, importance = FALSE)
+
+pred <- predict(randomF, newdata = data_test, type = "response")
+
+
+results <- as.data.frame(data_test$F34)
+colnames(results) <- c("actual")
+results$predicted <- as.numeric(pred) - 1
+results$hitmiss <- ifelse(((results$actual == 1 & results$predicted >= 0.5) | (results$actual == 0 & results$predicted < 0.5)),1,0)
+mean(results$hitmiss)
+
+ROCRpred <- prediction(results$predicted, results$actual)
+ROCRperf <- performance(ROCRpred, 'tpr', 'fpr')
+plot(ROCRperf, colorize = TRUE, text.adj = c(-0.2, 1.2))
+
+auc_ROCR <- performance(ROCRpred, measure = "auc")
+auc_ROCR <- auc_ROCR@y.values[[1]]
+auc_ROCR
+
